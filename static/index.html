@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>코트 기록실 · COURTSIDE</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="코트 기록실 홈"><span class="brand-icon">◉</span><span>COURTSIDE<small>코트 기록실</small></span></a>
+    <button id="upload-button" class="button primary upload-button"><span>＋</span> 경기 영상 추가</button>
+    <input id="upload-input" type="file" accept="video/*,.mkv,.avi" hidden>
+    <div id="upload-status" class="small muted" role="status"></div>
+    <div class="section-label">내 영상 <span id="session-count">0</span></div>
+    <nav id="session-list" class="session-list" aria-label="저장된 영상"></nav>
+    <div class="sidebar-bottom"><span class="local-dot"></span> 이 컴퓨터에서 분석·저장<small>영상은 외부 서버로 전송되지 않습니다.</small><button id="help-button" class="text-button">처음 사용하시나요? 사용 안내 ↗</button></div>
+  </aside>
+  <main>
+    <header class="topbar"><div class="breadcrumb">WORKSPACE <span>/</span> <span id="header-name">영상 분석</span></div><span class="local-badge">LOCAL · v0.1</span></header>
+    <section id="empty-state" class="empty-state">
+      <div class="eyebrow">YOUR GAME. YOUR RECORD.</div><h1>오늘의 플레이를<br><em>기록으로 남기세요.</em></h1>
+      <p>선수를 지정하고, 슛 장면을 확인하세요.<br>확정한 기록이 선수별 박스스코어가 됩니다.</p>
+      <button id="empty-upload" class="dropzone"><svg viewBox="0 0 280 130" aria-hidden="true"><rect x="10" y="10" width="260" height="110" rx="5"/><path d="M140 10v110M10 35h35v60H10M270 35h-35v60h35"/><circle cx="140" cy="65" r="25"/><path d="M45 45a25 25 0 0 1 0 40M235 45a25 25 0 0 0 0 40"/></svg><strong>영상 파일 선택 또는 여기에 놓기</strong><span>MP4 권장 · MOV, MKV 등 지원 · 최대 8GB</span></button>
+      <div class="empty-steps"><span><b>01</b> 선수 등록</span><span><b>02</b> 자동 후보 찾기</span><span><b>03</b> 확인하고 기록</span></div>
+    </section>
+    <div id="workspace" hidden>
+      <section class="page-heading"><div><div class="eyebrow">GAME REVIEW</div><h1 id="video-name">경기 영상</h1><p id="video-meta" class="muted"></p></div><div class="heading-actions"><button id="export-json" class="button quiet">기록 백업</button><button id="export-boxscore" class="button accent">박스스코어 CSV ↗</button></div></section>
+      <section class="settings-strip">
+        <label>촬영 범위<select id="footage-mode"><option value="offense">한 팀 공격 영상</option><option value="highlights">득점·하이라이트 모음</option><option value="full">양 팀 연속 경기 영상</option></select></label>
+        <label>카메라<select id="camera-mode"><option value="fixed">삼각대 · 고정</option><option value="moving">사람이 촬영 · 이동</option></select></label>
+        <p id="coverage-note"></p>
+      </section>
+      <div class="work-grid">
+        <div class="center-column">
+          <section class="panel video-panel">
+            <div class="panel-top"><h2><span class="tiny-dot"></span> 영상 & 선수 추적</h2><button id="frame-mode-button" class="text-button">프레임 모드</button></div>
+            <div id="video-stage" class="video-stage">
+              <video id="video" playsinline preload="metadata"></video><img id="frame-image" alt="선택한 시간의 영상 프레임" hidden>
+              <canvas id="overlay" aria-label="선수나 림을 드래그해 지정하는 영상 영역"></canvas>
+              <div id="draw-hint" class="draw-hint" hidden></div>
+              <div id="video-loading" class="video-loading">영상을 불러오는 중입니다.</div>
+            </div>
+            <div class="transport"><button id="play" class="icon-button" title="재생/일시정지 (Space)" aria-label="재생/일시정지">▶</button><button id="back" class="icon-button" title="1초 뒤로" aria-label="1초 뒤로">−1s</button><button id="forward" class="icon-button" title="1초 앞으로" aria-label="1초 앞으로">＋1s</button><span id="time-label" class="time-label">00:00 / 00:00</span><div class="transport-spacer"></div><label class="sr-only" for="playback-speed">재생 속도</label><select id="playback-speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><button id="mute" class="icon-button" title="음소거 전환" aria-label="음소거 전환">음소거</button></div>
+            <div class="timeline-area"><label class="sr-only" for="timeline">영상 시간 이동</label><input id="timeline" type="range" min="0" max="100" step="0.033" value="0"><div id="event-markers" class="event-markers"></div></div>
+            <div class="video-tools"><button id="register-player" class="button quiet">＋ 선수 지정</button><button id="register-hoop" class="button quiet">⌖ 골대 지정</button><label class="overlay-switch"><input id="show-tracks" type="checkbox" checked> 추적 표시</label><button id="new-event" class="button primary small-button">＋ 현재 장면 기록 <kbd>M</kbd></button></div>
+            <div class="tracking-legend"><span><i class="legend-solid"></i> 연결한 선수</span><span><i class="legend-dashed"></i> AI 선수 후보</span><span>박스를 클릭하면 추적 구간을 연결할 수 있어요.</span></div>
+          </section>
+          <section class="panel analysis-panel">
+            <div class="panel-top"><h2>자동 후보 찾기</h2><span class="subtle-tag">확인 후 기록에 반영</span></div>
+            <div class="analysis-controls"><label>시작(초)<input id="analysis-start" type="number" min="0" step="0.1" value="0"></label><span class="range-dash">—</span><label>종료(초)<input id="analysis-end" type="number" min="0" step="0.1" value="60"></label><label class="analysis-detail">분석 간격<select id="analysis-fps"><option value="3">빠르게 · 3fps</option><option value="5" selected>기본 · 5fps</option><option value="10">촘촘히 · 10fps</option></select></label><button id="analyze" class="button accent">분석 시작 →</button><button id="cancel-analysis" class="button quiet" hidden>중지</button></div>
+            <div class="analysis-shortcuts"><button id="range-next" class="text-button">현재부터 60초</button><button id="range-all" class="text-button">영상 전체</button><span id="analysis-prereq"></span></div>
+            <div id="job-display" class="job-display" hidden><div class="progress-track"><div id="job-progress"></div></div><div id="job-message" role="status"></div></div>
+            <div id="hoop-list" class="hoop-list"></div>
+          </section>
+          <section class="panel roster-panel"><div class="panel-top"><h2>등록 선수 <span id="player-count" class="count">0</span></h2><span class="small muted">옷·신발이 보이는 전신 장면을 지정하세요.</span></div><div id="roster" class="roster"></div></section>
+        </div>
+        <aside class="review-column">
+          <section class="panel editor-panel"><div class="panel-top"><h2 id="editor-title">현재 장면 기록</h2><button id="reset-editor" class="text-button">새 기록</button></div>
+            <form id="event-form">
+              <div class="form-row"><label>시간(초)<input id="event-time" type="number" min="0" step="any" value="0" required></label><label>기록 종류<select id="event-kind"><option value="shot">슛</option><option value="oreb">공격 리바운드</option><option value="dreb">수비 리바운드</option><option value="assist">어시스트</option><option value="steal">스틸</option><option value="block">블록</option><option value="turnover">턴오버</option><option value="foul">파울</option></select></label></div>
+              <label>선수<select id="event-player"><option value="">선수를 선택해주세요</option></select></label>
+              <div id="shot-fields"><label>슛 결과<select id="event-result"><option value="unknown">확인 필요</option><option value="made">성공</option><option value="missed">실패</option></select></label><label>점수 구분<select id="event-value"><option value="">확인 필요</option><option value="2">2점슛</option><option value="3">3점슛</option><option value="1">자유투</option></select></label></div>
+              <label>메모<input id="event-note" type="text" maxlength="500" placeholder="애매한 장면이나 확인한 내용을 남기세요."></label>
+              <div id="candidate-note" class="candidate-note" hidden></div>
+              <button id="confirm-event" type="submit" class="button accent full-width">확정하고 기록</button>
+              <div class="editor-secondary"><button id="save-pending" type="button" class="button quiet">임시 저장</button><button id="reject-event" type="button" class="button quiet">후보 제외</button><button id="replay-event" type="button" class="text-button">앞 장면 보기 ↶</button></div>
+              <p class="small muted editor-footnote">선수·결과·점수를 확인한 기록만 집계됩니다.</p>
+            </form>
+          </section>
+          <section class="panel review-panel"><div class="review-tabs"><button id="events-tab" class="active" role="tab" aria-selected="true">장면 기록 <span id="event-count">0</span></button><button id="tracks-tab" role="tab" aria-selected="false">추적 구간</button></div><div id="events-pane"><div class="review-filter"><label class="sr-only" for="event-filter">기록 상태 필터</label><select id="event-filter"><option value="pending">확인 필요</option><option value="confirmed">확정 기록</option><option value="all">전체 기록</option><option value="rejected">제외한 후보</option></select><button id="export-events" class="text-button">CSV ↗</button></div><div id="event-list" class="event-list"></div></div><div id="tracks-pane" hidden><p class="small muted track-description">짧은 추적 구간을 선수에게 연결하세요. 연결은 해당 구간에만 적용됩니다.</p><label class="track-filter"><input id="suggested-only" type="checkbox"> 선수 후보가 있는 구간만</label><div id="track-list" class="track-list"></div><button id="more-tracks" class="text-button" hidden>구간 더 보기</button></div></section>
+        </aside>
+      </div>
+      <section class="panel boxscore-panel"><div class="panel-top"><div><h2>선수별 박스스코어</h2><p id="stats-note" class="small muted"></p></div><span id="pending-badge" class="pending-badge"></span></div><div class="table-scroll"><table id="boxscore"><thead></thead><tbody></tbody></table></div><p class="stats-footnote">확정한 장면만 합산합니다. <strong>— 미집계</strong> · 출전시간은 집계하지 않습니다. 분석 구간 밖 장면과 자동 분석이 놓친 플레이는 직접 추가해주세요.</p></section>
+      <footer>COURTSIDE / 영상에서 확인할 수 있는 만큼, 정확하게 기록합니다.<span>Space 재생 · ← → 1초 이동 · M 장면 기록</span></footer>
+    </div>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="player-dialog"><form id="player-form"><div class="dialog-heading"><h2>선수 등록</h2><button type="button" class="icon-button close-dialog" aria-label="닫기">×</button></div><img id="player-preview" class="player-preview" alt="등록할 선수 영역"><label>연결할 선수<select id="player-existing"><option value="">새 선수 등록</option></select></label><div id="new-player-fields"><label>이름<input id="player-name" maxlength="60" placeholder="예: 형우 / 주황색 신발"></label><div class="form-row"><label>팀<input id="player-team" maxlength="40" placeholder="예: 흰색 팀"></label><label>등번호(선택)<input id="player-number" maxlength="10" placeholder="예: 12"></label></div><label>특징<input id="player-note" maxlength="300" placeholder="흰 긴팔 · 검정 반바지 · 주황색 신발"></label></div><p class="small muted">같은 선수의 다른 방향 장면은 ‘연결할 선수’를 선택해 추가하세요. 새 참고 장면은 다음 분석부터 반영됩니다.</p><button class="button accent full-width" type="submit">선수 저장</button></form></dialog>
+  <dialog id="hoop-dialog"><form id="hoop-form"><div class="dialog-heading"><h2>골대 적용 구간</h2><button type="button" class="icon-button close-dialog" aria-label="닫기">×</button></div><p class="muted small">지정한 림 위치를 사용할 영상 구간입니다. 편집으로 구도가 바뀌면 구간을 나눠 등록하세요.</p><label>구간 이름<input id="hoop-name" value="공격 골대" maxlength="60"></label><div class="form-row"><label>시작(초)<input id="hoop-start" type="number" step="any" min="0" required></label><label>종료(초)<input id="hoop-end" type="number" step="any" min="0" required></label></div><p class="small muted" id="hoop-reference"></p><button class="button accent full-width" type="submit">골대 저장</button></form></dialog>
+  <dialog id="track-dialog"><form id="track-form"><div class="dialog-heading"><h2>추적 구간 연결</h2><button type="button" class="icon-button close-dialog" aria-label="닫기">×</button></div><img id="track-preview" class="player-preview" alt="선택한 추적 구간의 선수"><p id="track-description" class="small muted"></p><label>선수<select id="track-player"></select></label><p class="small muted">다른 사람으로 바뀌는 구간이라면 연결을 해제하세요. 이미 확정한 기록은 장면 기록에서 따로 수정할 수 있습니다.</p><button class="button accent full-width" type="submit">이 구간 연결 저장</button></form></dialog>
+  <dialog id="help-dialog" class="help-dialog"><div class="dialog-heading"><h2>오늘 처음 쓰는 순서</h2><button type="button" class="icon-button close-dialog" aria-label="닫기">×</button></div><ol><li><strong>영상을 추가하세요.</strong> 처음에는 30~60초 구간으로 시험하세요. 기록은 자동 저장됩니다.</li><li><strong>선수를 등록하세요.</strong> 일시정지 → ‘선수 지정’ → 머리부터 신발까지 전신을 드래그하세요. 같은 선수의 앞·뒤 장면을 추가하면 도움이 됩니다.</li><li><strong>골대를 지정하세요.</strong> ‘골대 지정’ → 실제 공격 골대의 림을 가로로 감싸세요. 백보드 전체 대신 림 주변의 작은 영역을 지정합니다.</li><li><strong>분석을 실행하세요.</strong> 선수 추적과 골대 주변의 공 움직임으로 슛 후보를 찾습니다. 이동 촬영은 골대 위치를 놓칠 수 있어 고정 촬영부터 권장합니다.</li><li><strong>후보를 검토하세요.</strong> 선수·성공/실패·2점/3점을 확인하고 확정하세요. 놓친 장면은 M 키로 직접 추가합니다.</li><li><strong>CSV를 저장하세요.</strong> 경기 전체가 담기지 않았다면 ‘한 팀 공격’ 또는 ‘하이라이트’를 선택해 미집계 항목을 구분하세요.</li></ol><div class="help-note">자동 분석은 범용 감지 모델과 색상 단서를 사용한 시험 버전입니다. 등번호 OCR, 자동 2·3점 판정, 자동 어시스트·리바운드 판정은 제공하지 않습니다. 슛 후보에는 오탐과 누락이 있으며, 모든 확정은 사용자가 합니다.</div><p class="small muted">브라우저에서 영상이 재생되지 않으면 ‘프레임 모드’를 사용하세요. 프레임 모드는 느린 장면 검토용이며 오디오는 없습니다. 데이터는 프로그램 폴더의 data에 저장됩니다.</p><button id="help-close" class="button accent full-width">시작하기</button></dialog>
+  <script src="/app.js"></script>
+</body>
+</html>
